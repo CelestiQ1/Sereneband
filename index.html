@@ -1,0 +1,929 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>SereneBand — Environment</title>
+
+<!-- Libraries (CDNs) -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/animejs@3.2.1/lib/anime.min.js"></script>
+
+<style>
+  /* ------------------------
+     Design tokens & base
+     ------------------------ */
+  :root{
+    --bg-1: #e7f3ff;
+    --bg-2: #f7fbff;
+    --glass: rgba(255,255,255,0.7);
+    --accent: #4aa3ff;
+    --accent-2: #66d0b6;
+    --muted: #6b7280;
+    --good: #16a34a;
+    --bad: #ef4444;
+    --shadow: 0 10px 30px rgba(11,22,60,0.08);
+  }
+
+  html,body{height:100%; margin:0; font-family:Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;}
+  body { background: linear-gradient(180deg,var(--bg-1),var(--bg-2)); color:#072033; padding:0; overflow:hidden; }
+  .appWrap { height:100vh; display:grid; grid-template-rows: auto 1fr; }
+
+  /* Splash overlay */
+  .splash {
+    position:fixed; inset:0; display:flex; align-items:center; justify-content:center; z-index:9999;
+    background: radial-gradient(ellipse at center, rgba(255,255,255,0.6), rgba(255,255,255,0.05));
+    transition:opacity .6s ease, visibility .6s ease;
+  }
+  .splash.hide { opacity:0; visibility:hidden; pointer-events:none; }
+
+  .splashCard {
+    text-align:center; padding:34px 44px; border-radius:18px; background:linear-gradient(180deg, rgba(255,255,255,0.95), rgba(255,255,255,0.9));
+    box-shadow: 0 20px 60px rgba(11,22,60,0.12); backdrop-filter: blur(6px);
+  }
+  .splashCard h1 { margin:0; font-size:28px; letter-spacing:0.6px; color:#052230;}
+  .splashCard p { margin:8px 0 0; color:var(--muted); }
+
+  /* ------------------------
+     Layout
+     ------------------------ */
+  .shell { display:grid; grid-template-columns: 420px 1fr 360px; gap:18px; padding:26px; height:calc(100vh - 20px); box-sizing:border-box; align-items:start; }
+  .panel { border-radius:14px; background: linear-gradient(180deg, rgba(255,255,255,0.9), rgba(255,255,255,0.85)); padding:14px; box-shadow:var(--shadow); overflow:hidden; }
+  .panelTitle { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+  .titleMain { font-weight:700; font-size:16px; margin:0; }
+  .subtitle { color:var(--muted); font-size:12px; }
+
+  /* left column */
+  .leftCol { display:flex; flex-direction:column; gap:12px; height:100%; }
+
+  .controls { display:flex; flex-wrap:wrap; gap:8px; }
+  button { border:0; padding:10px 12px; border-radius:10px; cursor:pointer; font-weight:700; background:linear-gradient(180deg,var(--accent),#3a93e6); color:white; box-shadow: 0 8px 20px rgba(74,163,255,0.12); transition:transform .12s ease, box-shadow .12s ease, opacity .12s ease; }
+  button.secondary { background:white; color:var(--accent); border:1px solid rgba(74,163,255,0.12); box-shadow:none; }
+  button.ghost { background:transparent; color:var(--muted); border:1px dashed rgba(0,0,0,0.06); }
+  button:active { transform: translateY(2px) scale(.998); }
+  .btn-wide { flex:1; }
+
+  /* Buddy area (center) */
+  .centerCol { display:flex; flex-direction:column; gap:12px; height:100%; }
+  .ambient { border-radius:14px; overflow:hidden; position:relative; min-height:340px; display:flex; align-items:center; justify-content:center; }
+  .ambient .layer { position:absolute; inset:0; background-size:cover; background-position:center; transition:transform 0.6s ease, opacity 0.6s ease; }
+  .ambient .overlay { position:absolute; inset:0; background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,26,40,0.04)); pointer-events:none; }
+  .ambient .content { position:relative; z-index:2; text-align:center; color:#042231; padding:20px; width:88%; max-width:760px; }
+  .ambient h2 { margin:0; font-size:20px; font-weight:800; letter-spacing:0.3px; }
+  .ambient p { margin:8px 0 0; color:var(--muted); }
+
+  .rightCol { display:flex; flex-direction:column; gap:12px; height:100%; }
+
+  /* small widgets */
+  .metrics { display:flex; gap:10px; align-items:center; }
+  .metric { flex:1; padding:12px; border-radius:12px; background:linear-gradient(180deg, rgba(255,255,255,0.6), rgba(255,255,255,0.5)); text-align:center; }
+  .metric .val { font-weight:800; font-size:18px; }
+  .progress { height:8px; background:rgba(10,20,40,0.04); border-radius:999px; overflow:hidden; margin-top:8px; }
+  .progress > i { display:block; height:100%; background:linear-gradient(90deg,var(--accent),var(--accent-2)); width:0%; transition:width .2s linear; }
+
+  .chartWrap { height:120px; border-radius:12px; padding:8px; background:linear-gradient(180deg, rgba(255,255,255,0.6), rgba(255,255,255,0.5)); }
+
+  /* chat */
+  .chatWindow { display:flex; flex-direction:column; gap:8px; height:100%; }
+  .chatHistory { flex:1; overflow:auto; padding:8px; border-radius:8px; background:linear-gradient(180deg, rgba(255,255,255,0.7), rgba(255,255,255,0.45)); }
+  .msg { padding:10px 12px; margin:6px 0; border-radius:12px; max-width:88%; }
+  .msg.user { background:linear-gradient(180deg,#eaf2ff,#e6f7ff); margin-left:auto; color:#07324a; }
+  .msg.bot { background:linear-gradient(180deg,#fff,#f2fbf8); color:#07423b; }
+  .chatInputRow { display:flex; gap:8px; }
+  .textInput { flex:1; padding:10px 12px; border-radius:10px; border:1px solid rgba(0,0,0,0.06); }
+
+  /* report preview */
+  .reportPreview { display:flex; flex-direction:column; gap:8px; align-items:center; justify-content:center; min-height:160px; }
+
+  footer { font-size:12px; color:var(--muted); text-align:center; padding:6px 0; }
+
+  /* responsive */
+  @media (max-width:1100px){
+    .shell { grid-template-columns: 1fr; grid-template-rows: auto; padding:12px; overflow:auto; }
+    .panel { height:auto; }
+    body { overflow:auto; }
+  }
+</style>
+</head>
+<body>
+
+<div class="splash" id="splash">
+  <div class="splashCard" id="splashCard" role="dialog" aria-label="SereneBand splash">
+    <h1>SereneBand</h1>
+    <p style="margin-top:12px">An immersive environment for monitoring, learning, and calm.</p>
+    <div style="margin-top:18px;">
+      <button id="enterBtn" style="padding:10px 18px; border-radius:12px; font-weight:800; background:linear-gradient(90deg,#66d0b6,#4aa3ff); color:white; border:none; box-shadow:0 12px 30px rgba(74,163,255,0.12);">Enter SereneBand</button>
+    </div>
+  </div>
+</div>
+
+<div class="appWrap" id="app">
+  <!-- top-level (hidden while splash) -->
+  <div style="height:0"></div>
+
+  <div class="shell" id="shell" style="opacity:0; transform: translateY(8px); transition:opacity .6s ease, transform .6s ease;">
+    <!-- LEFT: controls & session -->
+    <div class="panel leftCol">
+      <div class="panelTitle">
+        <div>
+          <div class="titleMain">Controls</div>
+          <div class="subtitle">Hardware, Simulator, Session tools</div>
+        </div>
+        <div style="text-align:right;">
+          <div id="statusChip" class="subtitle">Ready</div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <button id="connectBtn">Connect Serial</button>
+        <button id="disconnectBtn" class="secondary" disabled>Disconnect</button>
+        <button id="simBtn" class="ghost">Simulator: OFF</button>
+        <button id="calmBtn" class="ghost">Send CALM</button>
+      </div>
+
+      <div style="display:flex; gap:8px; margin-top:6px;">
+        <button id="saveBtn" class="secondary btn-wide">Save Session</button>
+        <button id="exportBtn" class="secondary">Export CSV</button>
+      </div>
+
+      <div style="display:flex; gap:8px; margin-top:8px;">
+        <button id="exportImgBtn" class="secondary btn-wide">Export Report PNG</button>
+        <button id="exportJsonBtn" class="secondary">Export JSON</button>
+      </div>
+
+      <div style="margin-top:12px;">
+        <div class="titleMain" style="font-size:14px">Session History</div>
+        <div class="subtitle" style="margin-bottom:6px">Saved sessions & quick replay</div>
+        <div id="sessionsList" style="max-height:240px; overflow:auto; border-radius:8px; padding:8px; background:linear-gradient(180deg, rgba(255,255,255,0.7), transparent);"></div>
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <button id="replayBtn" class="ghost btn-wide">Replay Latest</button>
+          <button id="clearHistBtn" class="ghost">Clear</button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- CENTER: ambient + charts -->
+    <div class="panel centerCol">
+      <div class="panelTitle">
+        <div>
+          <div class="titleMain">Ambient Scene</div>
+          <div class="subtitle">High-quality background with parallax and calm transitions</div>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <label class="subtitle" style="margin-right:8px;">Upload BG</label>
+          <input id="bgUpload" type="file" accept="image/*" style="padding:6px;">
+        </div>
+      </div>
+
+      <div class="ambient" id="ambient">
+        <!-- layered backgrounds; initially procedural gradient + SVG -->
+        <div class="layer" id="bgLayer1" style="background:linear-gradient(180deg,#dff6ff,#f7fbff); filter:blur(0px);"></div>
+        <div class="layer" id="bgLayer2" style="opacity:0.6; transform:scale(1.02); background-image:radial-gradient(circle at 20% 20%, rgba(102,208,182,0.12), transparent 10%), radial-gradient(circle at 80% 80%, rgba(74,163,255,0.09), transparent 12%);"></div>
+        <div class="overlay"></div>
+
+        <div class="content" id="ambientContent">
+          <h2 id="ambientTitle">Welcome to SereneBand</h2>
+          <p id="ambientSubtitle">Start the sensor or simulator. Ask Serene for help.</p>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:12px; align-items:stretch; margin-top:6px;">
+        <div style="flex:1">
+          <div class="panelTitle"><div class="titleMain">Live Metrics</div><div class="subtitle">Realtime values</div></div>
+          <div class="metrics">
+            <div class="metric">
+              <div class="label">Heart Rate</div>
+              <div id="hrVal" class="val">-- bpm</div>
+              <div class="progress"><i id="hrProg" style="width:5%"></i></div>
+            </div>
+            <div class="metric">
+              <div class="label">GSR</div>
+              <div id="gsrVal" class="val">--</div>
+              <div class="progress"><i id="gsrProg" style="width:8%"></i></div>
+            </div>
+            <div class="metric">
+              <div class="label">Motion</div>
+              <div id="motionVal" class="val">--</div>
+              <div class="progress"><i id="motionProg" style="width:6%"></i></div>
+            </div>
+          </div>
+        </div>
+
+        <div style="width:420px">
+          <div class="panelTitle"><div class="titleMain">Charts</div><div class="subtitle">Interactive timeline</div></div>
+          <div class="chartWrap"><canvas id="hrChartCanvas"></canvas></div>
+          <div class="chartWrap"><canvas id="gsrChartCanvas"></canvas></div>
+          <div class="chartWrap"><canvas id="motionChartCanvas"></canvas></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT: chat / assistant -->
+    <div class="panel rightCol">
+      <div class="panelTitle">
+        <div>
+          <div class="titleMain">Serene — your assistant</div>
+          <div class="subtitle">Ask anything, ask to run tasks, or request a report</div>
+        </div>
+      </div>
+
+      <div class="chatWindow" style="height:100%;">
+        <div class="chatHistory" id="chatHistory" aria-live="polite"></div>
+
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <input id="chatInput" class="textInput" placeholder="Ask Serene — e.g. 'Analyze my session' or 'generate report'">
+          <button id="sendChat" class="secondary">Send</button>
+        </div>
+
+        <div style="margin-top:8px; display:flex; gap:8px;">
+          <button id="preset1" class="ghost">How am I doing?</button>
+          <button id="preset2" class="ghost">Export report</button>
+          <button id="preset3" class="ghost">Replay last</button>
+        </div>
+
+        <div style="margin-top:10px;">
+          <div class="titleMain" style="font-size:13px">Report Preview</div>
+          <div class="reportPreview" id="reportPreview">
+            <canvas id="reportCanvas" width="720" height="900" style="border-radius:8px; box-shadow:0 10px 30px rgba(0,0,0,0.08);"></canvas>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <footer style="position:fixed; bottom:12px; left:50%; transform:translateX(-50%); z-index:80; width:fit-content;">
+    SereneBand — private & local. Web Serial requires Chrome/Edge (secure context).
+  </footer>
+</div>
+
+<script>
+/*
+  SereneBand Environment
+  - Live serial & simulator
+  - Ambient background with upload
+  - Charts via Chart.js
+  - Local assistant "Serene" that can run commands and explain data
+  - Designed report export to PNG (rendered on canvas)
+  - Focus on calm visuals, tactile buttons, and user clarity
+*/
+
+/* ------------------------
+   Utility helpers
+   ------------------------ */
+const $ = id => document.getElementById(id);
+function elt(tag, cls, text){ const e = document.createElement(tag); if(cls) e.className = cls; if(text) e.textContent = text; return e; }
+function now(){ return Date.now(); }
+function pad2(n){ return String(n).padStart(2,'0'); }
+function formatDuration(s){ s=Math.max(0, Math.floor(s)); const h=Math.floor(s/3600), m=Math.floor((s%3600)/60), sec=s%60; return ${pad2(h)}:${pad2(m)}:${pad2(sec)}; }
+function clamp(v,min,max){ return Math.min(max, Math.max(min, v)); }
+
+/* ------------------------
+   App state
+   ------------------------ */
+const STATE = {
+  history: [],          // latest packets (newest first)
+  timestamps: [],
+  hrData: [], gsrData: [], motionData: [],
+  bestStreak: parseInt(localStorage.getItem('serene_best')||'0',10) || 0,
+  lastTicTime: 0,
+  lastStreak: 0,
+  lastPacket: now(),
+  port: null, reader: null, writer: null, buffer: '',
+  sim: false, simTimer: null
+};
+
+/* ------------------------
+   Splash behavior
+   ------------------------ */
+const splash = $('splash');
+const enterBtn = $('enterBtn');
+const shell = $('shell');
+
+enterBtn.addEventListener('click', () => {
+  // splash exit transition
+  splash.classList.add('hide');
+  setTimeout(() => { shell.style.opacity='1'; shell.style.transform='none'; }, 260);
+  // graceful initial messages
+  addBotMessage("Welcome — I'm Serene. I can analyze sessions, generate reports, and help you stay calm. Try 'How am I doing?' or start the simulator.");
+});
+
+/* ------------------------
+   Ambient background: upload and parallax
+   ------------------------ */
+const bgUpload = $('bgUpload');
+const bgLayer1 = $('bgLayer1');
+const bgLayer2 = $('bgLayer2');
+const ambientTitle = $('ambientTitle');
+const ambientSubtitle = $('ambientSubtitle');
+
+bgUpload.addEventListener('change', (e)=>{
+  const f = e.target.files && e.target.files[0];
+  if(!f) return;
+  const url = URL.createObjectURL(f);
+  bgLayer1.style.background = url('${url}') center/cover no-repeat;
+  bgLayer1.style.filter = 'blur(1px) saturate(1.02)';
+  ambientTitle.textContent = "Custom background loaded";
+  ambientSubtitle.textContent = f.name;
+});
+
+/* small parallax based on mouse movement */
+const ambient = $('ambient');
+ambient.addEventListener('mousemove', (ev)=>{
+  const r = ambient.getBoundingClientRect();
+  const cx = r.left + r.width/2; const cy = r.top + r.height/2;
+  const dx = (ev.clientX - cx) / r.width;
+  const dy = (ev.clientY - cy) / r.height;
+  bgLayer2.style.transform = translate(${dx * 8}px, ${dy * 6}px) scale(1.03);
+});
+
+/* ------------------------
+   Charts setup (Chart.js)
+   ------------------------ */
+const MAX_POINTS = 140;
+const hrCtx = $('hrChartCanvas').getContext('2d');
+const gsrCtx = $('gsrChartCanvas').getContext('2d');
+const motionCtx = $('motionChartCanvas').getContext('2d');
+
+function makeChart(ctx, label, color){
+  return new Chart(ctx, {
+    type: 'line',
+    data: { labels: STATE.timestamps, datasets: [{ label, data: [], borderColor: color, backgroundColor: 'transparent', tension: 0.3, pointRadius: 0 }] },
+    options: { animation:false, responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{display:false}, y:{ticks:{color:'#223'}}} }
+  });
+}
+const hrChart = makeChart(hrCtx,'HR','rgba(255,90,120,0.95)');
+const gsrChart = makeChart(gsrCtx,'GSR','rgba(34,197,94,0.95)');
+const motionChart = makeChart(motionCtx,'Motion','rgba(66,165,245,0.95)');
+
+function pushToCharts(t, hr, gsr, motion){
+  STATE.timestamps.push(t); STATE.hrData.push(hr); STATE.gsrData.push(gsr); STATE.motionData.push(motion);
+  if(STATE.timestamps.length > MAX_POINTS){
+    STATE.timestamps.shift(); STATE.hrData.shift(); STATE.gsrData.shift(); STATE.motionData.shift();
+  }
+  // update Chart.js datasets
+  hrChart.data.labels = STATE.timestamps.slice();
+  hrChart.data.datasets[0].data = STATE.hrData.slice();
+  gsrChart.data.labels = STATE.timestamps.slice();
+  gsrChart.data.datasets[0].data = STATE.gsrData.slice();
+  motionChart.data.labels = STATE.timestamps.slice();
+  motionChart.data.datasets[0].data = STATE.motionData.slice();
+  hrChart.update('none'); gsrChart.update('none'); motionChart.update('none');
+}
+
+/* ------------------------
+   UI elements references
+   ------------------------ */
+const hrVal = $('hrVal'), gsrVal = $('gsrVal'), motionVal = $('motionVal');
+const hrProg = $('hrProg'), gsrProg = $('gsrProg'), motionProg = $('motionProg');
+const statusChip = $('statusChip');
+const sessionsList = $('sessionsList');
+const exportImgBtn = $('exportImgBtn'), exportJsonBtn = $('exportJsonBtn'), exportBtn = $('exportBtn');
+const saveBtn = $('saveBtn'), replayBtn = $('replayBtn'), clearHistBtn = $('clearHistBtn');
+const connectBtn = $('connectBtn'), disconnectBtn = $('disconnectBtn'), simBtn = $('simBtn'), calmBtn = $('calmBtn');
+const chatHistory = $('chatHistory'), chatInput = $('chatInput'), sendChat = $('sendChat');
+const preset1 = $('preset1'), preset2 = $('preset2'), preset3 = $('preset3');
+const reportCanvas = $('reportCanvas');
+
+/* ------------------------
+   CSV parsing/packet
+   expected CSV: ax,ay,az,gsr,hr,tic,streak
+   ------------------------ */
+function parseLine(line){
+  line = String(line).trim();
+  if(!line) return null;
+  if(line.startsWith('{')) {
+    try{ const o = JSON.parse(line); const ax=Number(o.ax||0), ay=Number(o.ay||0), az=Number(o.az||0); const gsr=Number(o.gsr||0), hr=Number(o.hr||0); const tic=(o.tic===1||o.tic===true); const streak=Number(o.streak||0); const motion=Math.sqrt(ax*ax+ay*ay+az*az)/1e4; return {ax,ay,az,gsr,hr,tic,streak,motion,ts:now()}; }catch(e){ return null; }
+  }
+  const p = line.split(',').map(s=>s.trim());
+  if(p.length < 7) return null;
+  const ax = parseInt(p[0]||'0',10), ay = parseInt(p[1]||'0',10), az = parseInt(p[2]||'0',10);
+  const gsr = parseInt(p[3]||'0',10), hr = parseInt(p[4]||'0',10);
+  const tic = parseInt(p[5]||'0',10)===1; const streak = parseInt(p[6]||'0',10);
+  const motion = Math.sqrt(ax*ax + ay*ay + az*az) / (1e4 * Number(motionSens.value || 1));
+  return {ax,ay,az,gsr,hr,tic,streak,motion,ts:now()};
+}
+
+/* ------------------------
+   Handle incoming packet
+   ------------------------ */
+function handlePacket(pkt){
+  if(!pkt) return;
+  STATE.lastPacket = now();
+
+  // apply gsr scale (UI-controlled)
+  pkt.gsr = Math.round(pkt.gsr / Number(motionSens.value || 1) / Number(gsrSens.value || 1));
+
+  // push to history
+  STATE.history.unshift(pkt);
+  if(STATE.history.length > 2000) STATE.history.pop();
+
+  // quick UI feed
+  addHistoryItem(pkt);
+
+  // calculate streak / tic handling
+  if(pkt.tic){
+    vibrate(180); addBotStyleMessage('tic'); // small bot cue
+    STATE.lastTicTime = now();
+    STATE.lastStreak = 0;
+    feedback(); // visual + flash
+  } else {
+    STATE.lastStreak = pkt.streak || Math.floor((now() - STATE.lastTicTime)/1000);
+  }
+
+  if(STATE.lastStreak > STATE.bestStreak){
+    STATE.bestStreak = STATE.lastStreak;
+    localStorage.setItem('serene_best', String(STATE.bestStreak));
+  }
+
+  // update metrics displays
+  hrVal.textContent = pkt.hr + ' bpm'; gsrVal.textContent = pkt.gsr; motionVal.textContent = pkt.motion.toFixed(2);
+  hrProg.style.width = ${clamp((pkt.hr-40)/120*100, 4, 100)}%;
+  gsrProg.style.width = ${clamp((pkt.gsr)/2000*100, 4, 100)}%;
+  motionProg.style.width = ${clamp(pkt.motion*20, 4, 100)}%;
+
+  // push to charts
+  pushToCharts(new Date(pkt.ts).toLocaleTimeString(), pkt.hr, pkt.gsr, pkt.motion);
+
+  // adaptive sensitivity (simple rolling)
+  adaptSensitivity(pkt);
+
+  // auto calm threshold
+  if(STATE.autoCalm && (pkt.gsr > 900 || pkt.hr > 115)){
+    sendCALM();
+    statusChip.textContent = 'Auto-Calm triggered';
+  }
+}
+
+/* ------------------------
+   History UI
+   ------------------------ */
+function addHistoryItem(pkt){
+  const el = document.createElement('div'); el.style.display='flex'; el.style.justifyContent='space-between'; el.style.padding='8px'; el.style.borderBottom='1px dashed rgba(0,0,0,0.04)';
+  el.innerHTML = <div><strong>${pkt.tic?'<span style="color:var(--bad)">TIC</span>':'OK'}</strong> HR:${pkt.hr} GSR:${pkt.gsr}</div><div style="color:var(--muted)">${new Date(pkt.ts).toLocaleTimeString()}</div>;
+  const list = document.createElement('div');
+  list.appendChild(el);
+  // prepend to history UI inside left column session list (lightweight preview)
+  sessionsList.prepend(el.cloneNode(true));
+  // and keep length
+  while(sessionsList.children.length > 80) sessionsList.removeChild(sessionsList.lastChild);
+}
+
+/* ------------------------
+   Vibrate & flash feedback
+   ------------------------ */
+function vibrate(ms=150){ if(navigator.vibrate) navigator.vibrate(ms); }
+
+function flashScreen(col='rgba(255,120,120,0.08)', dur=240){
+  const f = document.createElement('div');
+  f.style.position='fixed'; f.style.left='0'; f.style.top='0'; f.style.right='0'; f.style.bottom='0';
+  f.style.background=col; f.style.pointerEvents='none'; f.style.opacity='0'; f.style.zIndex=9998;
+  document.body.appendChild(f);
+  anime({ targets:f, opacity:[0,1,0], duration:dur, easing:'easeOutQuad', complete:()=>f.remove() });
+}
+
+/* combined feedback */
+function feedback(){
+  flashScreen('rgba(255,110,110,0.08)',240);
+  vibrate(180);
+  // small ambient title change
+  ambientTitle.textContent = "Detected — breathe";
+  setTimeout(()=>{ ambientTitle.textContent = "Welcome to SereneBand"; }, 1200);
+}
+
+/* ------------------------
+   Serial: connect/read
+   ------------------------ */
+async function connectSerial(){
+  if(!('serial' in navigator)){ alert('Web Serial API not supported in this browser. Use Chrome/Edge (Desktop).'); return; }
+  try {
+    const p = await navigator.serial.requestPort();
+    await p.open({ baudRate: 115200 }).catch(()=>p.open({ baudRate:9600 }));
+    STATE.port = p;
+    statusChip.textContent = 'Connected';
+    connectBtn.disabled = true; disconnectBtn.disabled = false; simBtn.disabled = true;
+    // set up reader
+    const decoder = new TextDecoderStream();
+    const st = p.readable.pipeTo(decoder.writable);
+    STATE.reader = decoder.readable.getReader();
+    readSerialLoop();
+  } catch (e) {
+    console.error('connect err', e);
+    statusChip.textContent = 'Connection error';
+  }
+}
+
+async function readSerialLoop(){
+  try {
+    while(true){
+      const { value, done } = await STATE.reader.read();
+      if(done) break;
+      if(value){
+        STATE.buffer += value;
+        let idx;
+        while((idx = STATE.buffer.indexOf('\n')) !== -1){
+          const line = STATE.buffer.slice(0, idx);
+          STATE.buffer = STATE.buffer.slice(idx+1);
+          const p = parseLine(line);
+          if(p) handlePacket(p);
+        }
+      }
+    }
+  } catch(e){
+    console.error('read loop', e);
+    statusChip.textContent = 'Read error';
+  }
+}
+
+async function disconnectSerial(){
+  try {
+    if(STATE.reader) { await STATE.reader.cancel(); STATE.reader = null; }
+    if(STATE.port) { await STATE.port.close(); STATE.port = null; }
+  } catch(e){ console.warn(e); }
+  connectBtn.disabled = false; disconnectBtn.disabled = true; simBtn.disabled = false;
+  statusChip.textContent = 'Disconnected';
+}
+
+async function sendCALM(){
+  if(!STATE.port) { statusChip.textContent = 'No serial to send CALM'; return false; }
+  try {
+    if(!STATE.port.writable) { statusChip.textContent = 'Port not writable'; return false; }
+    const writer = STATE.port.writable.getWriter();
+    await writer.write(new TextEncoder().encode('CALM\n'));
+    writer.releaseLock();
+    statusChip.textContent = 'CALM sent';
+    return true;
+  } catch(e){
+    console.warn('send calm', e);
+    statusChip.textContent = 'CALM failed';
+    return false;
+  }
+}
+
+/* ------------------------
+   Simulator
+   ------------------------ */
+function startSim(){
+  if(STATE.sim) return;
+  STATE.sim = true; simBtn.textContent='Simulator: ON'; simBtn.style.background='linear-gradient(90deg,#ffd6d6,#ff9aa2)';
+  statusChip.textContent = 'Simulator running';
+  STATE.simTimer = setInterval(()=>{
+    const ax = Math.round((Math.random()*2000 + 9000) * (Math.random() < 0.03 ? 3 : 1));
+    const ay = Math.round((Math.random()*800 - 400));
+    const az = Math.round((Math.random()*2000 + 14000));
+    const gsr = Math.round(Math.random()*400 + 380);
+    const hr = Math.round(Math.random()*35 + 62);
+    const ticRand = Math.random() < 0.08 ? 1 : 0;
+    if(ticRand === 1){ STATE.lastTicTime = now(); STATE.lastStreak = 0; } else { STATE.lastStreak++; }
+    const pkt = parseLine(${ax},${ay},${az},${gsr},${hr},${ticRand},${STATE.lastStreak}\n);
+    if(pkt) handlePacket(pkt);
+  }, 900);
+}
+
+function stopSim(){
+  if(!STATE.sim) return;
+  STATE.sim = false; simBtn.textContent='Simulator: OFF'; simBtn.style.background='';
+  statusChip.textContent='Simulator stopped';
+  if(STATE.simTimer) clearInterval(STATE.simTimer);
+  STATE.simTimer = null;
+}
+
+/* ------------------------
+   Session save/export
+   ------------------------ */
+function saveSession(){
+  let store = JSON.parse(localStorage.getItem('serene_sessions')||'[]');
+  const samples = STATE.history.slice(0, 600);
+  const session = { savedAt: new Date().toISOString(), durationSec: (samples.length*1), bestStreak: STATE.bestStreak, samples };
+  store.push(session);
+  localStorage.setItem('serene_sessions', JSON.stringify(store));
+  statusChip.textContent = 'Session saved';
+  refreshSessionList();
+}
+
+function refreshSessionList(){
+  const arr = JSON.parse(localStorage.getItem('serene_sessions')||'[]');
+  sessionsList.innerHTML = '';
+  arr.slice().reverse().forEach((s, idx) => {
+    const d = new Date(s.savedAt).toLocaleString();
+    const el = elt('div',null);
+    el.style.padding='8px'; el.style.borderBottom='1px dashed rgba(0,0,0,0.04)';
+    el.innerHTML = <div style="display:flex; justify-content:space-between;"><div><strong>${d}</strong><div class="subtitle" style="font-size:12px">Best: ${formatDuration(s.bestStreak)}</div></div><div><button data-idx="${arr.length-1-idx}" class="replaySessionBtn" style="padding:6px 8px;border-radius:8px;border:0;background:linear-gradient(90deg,#4aa3ff,#66d0b6);color:white">Replay</button></div></div>;
+    sessionsList.appendChild(el);
+  });
+  // attach handlers
+  sessionsList.querySelectorAll('.replaySessionBtn').forEach(b => {
+    b.addEventListener('click', () => {
+      const idx = Number(b.getAttribute('data-idx'));
+      replaySessionAtIndex(idx);
+    });
+  });
+}
+
+function exportCSV(){
+  const rows = [['timestamp','ax','ay','az','gsr','hr','tic','streak','motion']];
+  for(let i=STATE.history.length-1;i>=0;i--){
+    const p = STATE.history[i];
+    rows.push([new Date(p.ts).toISOString(), p.ax, p.ay, p.az, p.gsr, p.hr, p.tic?1:0, p.streak, p.motion.toFixed(3)]);
+  }
+  const csv = rows.map(r => r.map(cell => "${String(cell).replace(/"/g,'""')}").join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = sereneband_${Date.now()}.csv; a.click(); URL.revokeObjectURL(a.href);
+}
+
+function exportJSON(){
+  const s = localStorage.getItem('serene_sessions');
+  if(!s) return alert('No sessions');
+  const blob = new Blob([s], { type: 'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = serene_sessions_${Date.now()}.json; a.click(); URL.revokeObjectURL(a.href);
+}
+
+/* replay */
+let replayTimer = null;
+function replayLatest(){
+  const arr = JSON.parse(localStorage.getItem('serene_sessions')||'[]');
+  if(!arr.length) return alert('No saved sessions');
+  const s = arr[arr.length-1];
+  replaySession(s);
+}
+
+function replaySessionAtIndex(idx){
+  const arr = JSON.parse(localStorage.getItem('serene_sessions')||'[]');
+  if(idx<0 || idx>=arr.length) return alert('Invalid session index');
+  replaySession(arr[idx]);
+}
+
+function replaySession(session){
+  if(!session || !session.samples || !session.samples.length) return alert('Empty session');
+  clearAllHistory();
+  statusChip.textContent = 'Replaying session...';
+  let i=0;
+  replayTimer = setInterval(()=> {
+    if(i >= session.samples.length){ clearInterval(replayTimer); statusChip.textContent='Replay finished'; return; }
+    handlePacket(session.samples[i++]);
+  }, 420);
+}
+
+/* clear */
+function clearAllHistory(){
+  STATE.history.length = 0;
+  STATE.timestamps.length = 0;
+  STATE.hrData.length = 0;
+  STATE.gsrData.length = 0;
+  STATE.motionData.length = 0;
+  sessionsList.innerHTML = '';
+  refreshSessionList();
+  hrChart.update(); gsrChart.update(); motionChart.update();
+  statusChip.textContent = 'Cleared';
+}
+
+/* ------------------------
+   Adaptive sensitivity (simple heuristic)
+   ------------------------ */
+let ticWindow = [];
+function adaptSensitivity(pkt){
+  ticWindow.push(pkt.tic?1:0);
+  if(ticWindow.length > 80) ticWindow.shift();
+  const cnt = ticWindow.reduce((a,b)=>a+b,0);
+  // if many tics in short window, increase GSR sensitivity slightly
+  if(cnt > 12 && gsrSens.value < 3.0) {
+    gsrSens.value = (Number(gsrSens.value) + 0.05).toFixed(2);
+    statusChip.textContent = 'Adaptive: increased GSR sensitivity';
+  }
+}
+
+/* ------------------------
+   Report generation (designed image)
+   - draws charts and metrics onto report canvas
+   ------------------------ */
+function generateReportCanvas(){
+  const ctx = reportCanvas.getContext('2d');
+  const w = reportCanvas.width, h = reportCanvas.height;
+  // clear and draw background
+  ctx.clearRect(0,0,w,h);
+  // calm gradient background
+  const g = ctx.createLinearGradient(0,0,0,h);
+  g.addColorStop(0,'#eaf6f1'); g.addColorStop(1,'#f0f8ff');
+  ctx.fillStyle = g; ctx.fillRect(0,0,w,h);
+
+  // header
+  ctx.fillStyle = '#072033'; ctx.font = 'bold 22px Inter, sans-serif';
+  ctx.fillText('SereneBand Session Report', 28, 44);
+  ctx.font = '12px Inter, sans-serif'; ctx.fillStyle = '#073b52';
+  ctx.fillText(Generated: ${new Date().toLocaleString()}, 28, 66);
+
+  // summary box
+  ctx.fillStyle = 'rgba(255,255,255,0.9)'; roundRect(ctx, 20, 86, w-40, 120, 12, true, false);
+  ctx.fillStyle = '#072033'; ctx.font='bold 16px Inter';
+  ctx.fillText('Summary', 36, 110);
+  ctx.font='13px Inter';
+  const total = STATE.history.length;
+  const avgHr = average(STATE.hrData).toFixed(1) || '--';
+  const avgGsr = average(STATE.gsrData).toFixed(1) || '--';
+  const ticCount = STATE.history.reduce((a,p)=>a+(p.tic?1:0),0);
+  ctx.fillStyle = '#073b52';
+  ctx.fillText(Duration samples: ${total}, 36, 140);
+  ctx.fillText(Average HR: ${avgHr} bpm, 36, 160);
+  ctx.fillText(Average GSR: ${avgGsr}, 220, 160);
+  ctx.fillText(Tic events: ${ticCount}, 420, 160);
+
+  // small charts drawn manually for portability
+  drawMiniLine(ctx, 36, 220, 640, 100, STATE.hrData, '#ff6e79', 'HR (bpm)');
+  drawMiniLine(ctx, 36, 340, 640, 100, STATE.gsrData, '#32d296', 'GSR');
+  drawMiniLine(ctx, 36, 460, 640, 100, STATE.motionData, '#4aa3ff', 'Motion');
+
+  // footer
+  ctx.fillStyle='#08404f'; ctx.font='12px Inter';
+  ctx.fillText('Interpretation: Higher GSR and HR values correlate with stress; use Tic events section to review spikes.', 28, 590);
+
+  // drawn, now preview is the canvas already shown in UI
+}
+
+/* helper to draw rounded rect */
+function roundRect(ctx, x, y, w, h, r, fill, stroke){
+  ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
+  if(fill){ ctx.fill(); } if(stroke){ ctx.stroke(); }
+}
+
+/* helper to draw mini sparkline with area */
+function drawMiniLine(ctx, x, y, w, h, arr, color, label){
+  ctx.save();
+  ctx.translate(x,y);
+  // box
+  ctx.fillStyle='rgba(255,255,255,0.9)'; roundRect(ctx, 0, 0, w, h, 10, true, false);
+  ctx.fillStyle='#073b52'; ctx.font='bold 13px Inter'; ctx.fillText(label, 12, 18);
+  if(!arr || !arr.length){ ctx.fillStyle='#6b7280'; ctx.font='12px Inter'; ctx.fillText('No data', w/2-20, h/2); ctx.restore(); return; }
+  // normalize
+  const max = Math.max(...arr), min = Math.min(...arr);
+  const range = Math.max(1, max-min);
+  ctx.beginPath();
+  for(let i=0;i<arr.length;i++){
+    const px = 12 + (i/(arr.length-1))*(w-24);
+    const py = 26 + (1 - (arr[i]-min)/range)*(h-36);
+    if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+  }
+  ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke();
+  // fill area
+  ctx.lineTo(12 + (w-24), h-10); ctx.lineTo(12, h-10); ctx.closePath();
+  ctx.fillStyle = hexToRgba(color, 0.08); ctx.fill();
+  ctx.restore();
+}
+
+/* small helpers */
+function average(arr){ if(!arr || !arr.length) return 0; return arr.reduce((a,b)=>a+b,0)/arr.length; }
+function hexToRgba(hex, alpha){ // hex like #rrggbb or rgb(...) support simple conversion only
+  if(hex.startsWith('rgba')) return hex;
+  if(hex.startsWith('rgb')) return hex;
+  // parse #rrggbb
+  const v = hex.replace('#','');
+  const r = parseInt(v.substring(0,2),16), g=parseInt(v.substring(2,4),16), b=parseInt(v.substring(4,6),16);
+  return rgba(${r},${g},${b},${alpha});
+}
+
+/* export report PNG */
+exportImgBtn.addEventListener('click', ()=>{
+  generateReportCanvas();
+  const a = document.createElement('a'); a.href = reportCanvas.toDataURL('image/png'); a.download = sereneband_report_${Date.now()}.png; a.click();
+});
+
+/* ------------------------
+   Chat assistant "Serene"
+   - local conversational engine with simple command parsing
+   ------------------------ */
+function addBotMessage(txt){
+  const m = document.createElement('div'); m.className='msg bot'; m.textContent = txt;
+  chatHistory.appendChild(m); chatHistory.scrollTop = chatHistory.scrollHeight;
+}
+function addUserMessage(txt){
+  const m = document.createElement('div'); m.className='msg user'; m.textContent = txt;
+  chatHistory.appendChild(m); chatHistory.scrollTop = chatHistory.scrollHeight;
+}
+
+sendChat.addEventListener('click', () => { const t = chatInput.value.trim(); if(!t) return; addUserMessage(t); processUserMessage(t); chatInput.value=''; });
+chatInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter') sendChat.click(); });
+
+preset1.addEventListener('click', ()=>{ chatInput.value="How am I doing?"; sendChat.click(); });
+preset2.addEventListener('click', ()=>{ chatInput.value="Generate a report and export it"; sendChat.click(); });
+preset3.addEventListener('click', ()=>{ chatInput.value="Replay latest session"; sendChat.click(); });
+
+/* simple NLU and response */
+async function processUserMessage(text){
+  // basic command parsing - lowercased
+  const t = text.toLowerCase();
+  // first, simple built-in commands:
+  if(t.includes('report') || t.includes('export report') || t.includes('generate report')){
+    addBotMessage("Creating a designed report image now. I'll include charts, summary, and key stats.");
+    // draw report and show preview
+    generateReportCanvas();
+    addBotMessage("Report preview updated on the right. Click Export Report PNG to download.");
+    return;
+  }
+  if(t.includes('replay')){
+    addBotMessage("Replaying the most recent saved session.");
+    replayLatest();
+    return;
+  }
+  if(t.includes('save session')){
+    saveSession(); addBotMessage("Session saved locally.");
+    return;
+  }
+  if(t.includes('export csv')){
+    exportCSV(); addBotMessage("CSV exported.");
+    return;
+  }
+  if(t.includes('calm') && t.includes('send')){
+    const ok = await sendCALM(); addBotMessage(ok ? "Sent CALM to device." : "Unable to send CALM (no device).");
+    return;
+  }
+  if(t.includes('how am i') || t.includes('how am i doing') || t.includes('analysis') || t.includes('insight')){
+    // run a small client-side analysis
+    const total = STATE.history.length;
+    const avgHR = average(STATE.hrData); const sdHR = stddev(STATE.hrData);
+    const avgGSR = average(STATE.gsrData); const ticCount = STATE.history.reduce((a,p)=>a+(p.tic?1:0),0);
+    addBotMessage(Quick analysis — samples: ${total}. Avg HR: ${avgHR.toFixed(1)} bpm (sd ${sdHR.toFixed(1)}). Avg GSR: ${avgGSR.toFixed(1)}. Tic events: ${ticCount}. Higher HR/GSR often indicate stress; consider a 'CALM' signal or guided breathing.);
+    return;
+  }
+
+  if(t.includes('hello') || t.includes('hi') || t.includes('hey')){
+    addBotMessage("Hello — I'm Serene. I can analyze your session, create reports, run the simulator, or send calm signals. Try 'Generate report' or 'Replay latest session'.");
+    return;
+  }
+
+  // fallback: friendly conversational reply (local scripted style)
+  addBotMessage("Thanks for asking — I can help with the dashboard and your data. Try commands like 'How am I doing?', 'Generate report', or 'Save session'. For open conversation, tell me what you're curious about and I'll do my best.");
+}
+
+/* ------------------------
+   Small analytics helper: standard deviation
+   ------------------------ */
+function stddev(arr){
+  if(!arr.length) return 0;
+  const m = average(arr);
+  return Math.sqrt(arr.reduce((s,x)=>s+(x-m)*(x-m),0)/arr.length);
+}
+
+/* ------------------------
+   Misc UI interactions & wiring
+   ------------------------ */
+connectBtn.addEventListener('click', connectSerial);
+disconnectBtn.addEventListener('click', disconnectSerial);
+simBtn.addEventListener('click', ()=>{ STATE.sim ? stopSim() : startSim(); });
+calmBtn.addEventListener('click', ()=>{ sendCALM(); });
+saveBtn.addEventListener('click', saveSession);
+exportBtn.addEventListener('click', exportCSV);
+exportJsonBtn.addEventListener('click', exportJSON);
+replayBtn.addEventListener('click', replayLatest);
+clearHistBtn.addEventListener('click', clearAllHistory);
+
+/* sensitivity sliders */
+const motionSens = (()=>{ const v = document.createElement('input'); v.type='range'; v.min=0.2; v.max=3.0; v.step=0.05; v.value=1.0; return v; })();
+const gsrSens = (()=>{ const v = document.createElement('input'); v.type='range'; v.min=0.5; v.max=3.0; v.step=0.05; v.value=1.0; return v; })();
+// attach to document visually in a small corner if not in UI already
+motionSens.id='motionSens'; gsrSens.id='gsrSens';
+document.body.appendChild(motionSens); document.body.appendChild(gsrSens);
+motionSens.style.position='fixed'; motionSens.style.left='8px'; motionSens.style.bottom='12px'; motionSens.style.width='120px'; motionSens.style.opacity=0.7;
+gsrSens.style.position='fixed'; gsrSens.style.left='140px'; gsrSens.style.bottom='12px'; gsrSens.style.width='120px'; gsrSens.style.opacity=0.7;
+
+/* initial sessions list */
+refreshSessionList();
+
+/* idle check */
+setInterval(()=> {
+  if(now() - STATE.lastPacket > 6000) statusChip.textContent = 'No data — check device';
+}, 2500);
+
+/* small keyboard shortcuts */
+window.addEventListener('keydown', (e)=>{
+  if(e.key.toLowerCase()==='s') simBtn.click();
+  if(e.key.toLowerCase()==='c') connectBtn.click();
+  if(e.key.toLowerCase()==='r') replayBtn.click();
+});
+
+/* ------------------------
+   Initial preview report draw
+   ------------------------ */
+generateReportCanvas();
+
+/* ------------------------
+   Utility: draw initial guide on report canvas
+   ------------------------ */
+(function initialReport(){
+  const ctx = reportCanvas.getContext('2d');
+  ctx.clearRect(0,0,reportCanvas.width, reportCanvas.height);
+  ctx.fillStyle = '#eef9f5'; ctx.fillRect(0,0,reportCanvas.width,reportCanvas.height);
+  ctx.fillStyle = '#052a2d'; ctx.font='bold 18px Inter'; ctx.fillText('Report preview', 28, 44);
+  ctx.font='12px Inter'; ctx.fillStyle='#08404f'; ctx.fillText('Once you collect data, Serene can generate a full designed report here.', 28, 70);
+})();
+
+/* ------------------------
+   Done.
+   ------------------------ */
+
+</script>
+
+</body>
+</html>
